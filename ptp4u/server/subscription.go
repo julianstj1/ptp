@@ -16,10 +16,8 @@ limitations under the License.
 package server
 
 import (
-	"encoding/binary"
 	"net"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	ptp "github.com/facebookincubator/ptp/protocol"
@@ -29,42 +27,29 @@ import (
 // SubscriptionClient is sending subscriptionType messages periodically
 type SubscriptionClient struct {
 	sync.Mutex
-
-	worker           *sendWorker
 	subscriptionType ptp.MessageType
-	serverConfig     *Config
 
 	interval   time.Duration
 	expire     time.Time
 	sequenceID uint16
 	running    bool
+	queue      chan *SubscriptionClient
 
 	// addresses
 	ecliAddr *net.UDPAddr
 	gcliAddr *net.UDPAddr
-
-	// packets
-	syncP     *ptp.SyncDelayReq
-	followupP *ptp.FollowUp
-	announceP *ptp.Announce
 }
 
 // NewSubscriptionClient gets minimal required arguments to create a subscription
-func NewSubscriptionClient(w *sendWorker, ip net.IP, st ptp.MessageType, sc *Config, i time.Duration, e time.Time) *SubscriptionClient {
+func NewSubscriptionClient(queue chan *SubscriptionClient, ip net.IP, st ptp.MessageType, i time.Duration, e time.Time) *SubscriptionClient {
 	s := &SubscriptionClient{
+		queue:            queue,
 		ecliAddr:         &net.UDPAddr{IP: ip, Port: ptp.PortEvent},
 		gcliAddr:         &net.UDPAddr{IP: ip, Port: ptp.PortGeneral},
 		subscriptionType: st,
 		interval:         i,
 		expire:           e,
-		worker:           w,
-		serverConfig:     sc,
 	}
-
-	s.initSync()
-	s.initFollowup()
-	s.initAnnounce()
-
 	return s
 }
 
@@ -72,33 +57,24 @@ func NewSubscriptionClient(w *sendWorker, ip net.IP, st ptp.MessageType, sc *Con
 func (sc *SubscriptionClient) Start() {
 	sc.setRunning(true)
 	defer sc.Stop()
-	/*
-		Calculate the load we add to the worker. Ex:
-		sc.interval = 10000ms. l = 1
-		sc.interval = 2000ms.  l = 5
-		sc.interval = 500ms.   l = 20
-		sc.interval = 7ms.     l = 1428
-		https://play.golang.org/p/XKnACWjKd24
-	*/
-	l := 10 * time.Second.Microseconds() / sc.interval.Microseconds()
-	atomic.AddInt64(&sc.worker.load, l)
-	defer atomic.AddInt64(&sc.worker.load, -l)
 	log.Infof("Starting a new %s subscription for %s", sc.subscriptionType, sc.ecliAddr.IP)
-	log.Debugf("Starting a new %s subscription for %s with load %d with interval %s which expires in %s", sc.subscriptionType, sc.ecliAddr.IP, l, sc.interval, sc.expire)
 
 	// Send first message right away
-	sc.worker.queue <- sc
+	sc.queue <- sc
 
 	intervalTicker := time.NewTicker(sc.interval)
 	oldInterval := sc.interval
 
+	var now time.Time
+
 	defer intervalTicker.Stop()
 	for range intervalTicker.C {
-		log.Debugf("Subscription %s for %s is valid until %s", sc.subscriptionType, sc.ecliAddr.IP, sc.expire)
 		if !sc.Running() {
 			return
 		}
-		if time.Now().After(sc.expire) {
+		log.Debugf("Subscription %s for %s is valid until %s", sc.subscriptionType, sc.ecliAddr.IP, sc.expire)
+		now = time.Now()
+		if now.After(sc.expire) {
 			log.Infof("Subscription %s is over for %s", sc.subscriptionType, sc.ecliAddr.IP)
 			// TODO send cancellation
 			return
@@ -109,7 +85,7 @@ func (sc *SubscriptionClient) Start() {
 			oldInterval = sc.interval
 		}
 		// Add myself to the worker queue
-		sc.worker.queue <- sc
+		sc.queue <- sc
 	}
 }
 
@@ -130,195 +106,4 @@ func (sc *SubscriptionClient) Running() bool {
 // Stop stops the subscription
 func (sc *SubscriptionClient) Stop() {
 	sc.setRunning(false)
-}
-
-type syncMapCli struct {
-	sync.Mutex
-	m map[ptp.PortIdentity]*syncMapSub
-}
-
-// init initializes the underlying map
-func (s *syncMapCli) init() {
-	s.m = make(map[ptp.PortIdentity]*syncMapSub)
-}
-
-// load gets the value by the key
-func (s *syncMapCli) load(key ptp.PortIdentity) (*syncMapSub, bool) {
-	s.Lock()
-	defer s.Unlock()
-	subs, found := s.m[key]
-	return subs, found
-}
-
-// store saves the value with the key
-func (s *syncMapCli) store(key ptp.PortIdentity, val *syncMapSub) {
-	s.Lock()
-	if _, ok := s.m[key]; !ok {
-		subs := &syncMapSub{}
-		subs.init()
-		s.m[key] = subs
-	}
-	s.m[key] = val
-	s.Unlock()
-}
-
-// delete deletes the value by the key
-func (s *syncMapCli) delete(key ptp.PortIdentity) {
-	s.Lock()
-	delete(s.m, key)
-	s.Unlock()
-}
-
-// keys returns slice of keys of the underlying map
-func (s *syncMapCli) keys() []ptp.PortIdentity {
-	keys := make([]ptp.PortIdentity, 0, len(s.m))
-	s.Lock()
-	for k := range s.m {
-		keys = append(keys, k)
-	}
-	s.Unlock()
-	return keys
-}
-
-type syncMapSub struct {
-	sync.Mutex
-	m map[ptp.MessageType]*SubscriptionClient
-}
-
-// init initializes the underlying map
-func (s *syncMapSub) init() {
-	s.m = make(map[ptp.MessageType]*SubscriptionClient)
-}
-
-// load gets the value by the key
-func (s *syncMapSub) load(key ptp.MessageType) (*SubscriptionClient, bool) {
-	s.Lock()
-	defer s.Unlock()
-	sc, found := s.m[key]
-	return sc, found
-}
-
-// store saves the value with the key
-func (s *syncMapSub) store(key ptp.MessageType, val *SubscriptionClient) {
-	s.Lock()
-	s.m[key] = val
-	s.Unlock()
-}
-
-// keys returns slice of keys of the underlying map
-func (s *syncMapSub) keys() []ptp.MessageType {
-	keys := make([]ptp.MessageType, 0, len(s.m))
-	s.Lock()
-	for k := range s.m {
-		keys = append(keys, k)
-	}
-	s.Unlock()
-	return keys
-}
-
-func (sc *SubscriptionClient) initSync() {
-	sc.syncP = &ptp.SyncDelayReq{
-		Header: ptp.Header{
-			SdoIDAndMsgType: ptp.NewSdoIDAndMsgType(ptp.MessageSync, 0),
-			Version:         ptp.Version,
-			MessageLength:   uint16(binary.Size(ptp.SyncDelayReq{})),
-			DomainNumber:    0,
-			FlagField:       ptp.FlagUnicast | ptp.FlagTwoStep,
-			SequenceID:      0,
-			SourcePortIdentity: ptp.PortIdentity{
-				PortNumber:    1,
-				ClockIdentity: sc.serverConfig.clockIdentity,
-			},
-			LogMessageInterval: 0x7f,
-			ControlField:       0,
-		},
-	}
-}
-
-// syncPacket generates ptp Sync packet
-func (sc *SubscriptionClient) syncPacket() *ptp.SyncDelayReq {
-	sc.syncP.SequenceID = sc.sequenceID
-	return sc.syncP
-}
-
-func (sc *SubscriptionClient) initFollowup() {
-	sc.followupP = &ptp.FollowUp{
-		Header: ptp.Header{
-			SdoIDAndMsgType: ptp.NewSdoIDAndMsgType(ptp.MessageFollowUp, 0),
-			Version:         ptp.Version,
-			MessageLength:   uint16(binary.Size(ptp.FollowUp{})),
-			DomainNumber:    0,
-			FlagField:       ptp.FlagUnicast,
-			SequenceID:      0,
-			SourcePortIdentity: ptp.PortIdentity{
-				PortNumber:    1,
-				ClockIdentity: sc.serverConfig.clockIdentity,
-			},
-			LogMessageInterval: 0,
-			ControlField:       2,
-		},
-		FollowUpBody: ptp.FollowUpBody{
-			PreciseOriginTimestamp: ptp.NewTimestamp(time.Now()),
-		},
-	}
-}
-
-// followupPacket generates ptp Follow Up packet
-func (sc *SubscriptionClient) followupPacket(hwts time.Time) *ptp.FollowUp {
-	i, err := ptp.NewLogInterval(sc.interval)
-	if err != nil {
-		log.Errorf("Failed to get interval: %v", err)
-	}
-
-	sc.followupP.SequenceID = sc.sequenceID
-	sc.followupP.LogMessageInterval = i
-	sc.followupP.PreciseOriginTimestamp = ptp.NewTimestamp(hwts)
-	return sc.followupP
-}
-
-func (sc *SubscriptionClient) initAnnounce() {
-	sc.announceP = &ptp.Announce{
-		Header: ptp.Header{
-			SdoIDAndMsgType: ptp.NewSdoIDAndMsgType(ptp.MessageAnnounce, 0),
-			Version:         ptp.Version,
-			MessageLength:   uint16(binary.Size(ptp.Announce{})),
-			DomainNumber:    0,
-			FlagField:       ptp.FlagUnicast | ptp.FlagPTPTimescale,
-			SequenceID:      0,
-			SourcePortIdentity: ptp.PortIdentity{
-				PortNumber:    1,
-				ClockIdentity: sc.serverConfig.clockIdentity,
-			},
-			LogMessageInterval: 0,
-			ControlField:       5,
-		},
-		AnnounceBody: ptp.AnnounceBody{
-			CurrentUTCOffset:     0,
-			Reserved:             0,
-			GrandmasterPriority1: 128,
-			GrandmasterClockQuality: ptp.ClockQuality{
-				ClockClass:              6,
-				ClockAccuracy:           33, // 0x21 - Time Accurate within 100ns
-				OffsetScaledLogVariance: 23008,
-			},
-			GrandmasterPriority2: 128,
-			GrandmasterIdentity:  sc.serverConfig.clockIdentity,
-			StepsRemoved:         0,
-			TimeSource:           ptp.TimeSourceGNSS,
-		},
-	}
-}
-
-// announcePacket generates ptp Announce packet
-func (sc *SubscriptionClient) announcePacket() *ptp.Announce {
-	i, err := ptp.NewLogInterval(sc.interval)
-	if err != nil {
-		log.Errorf("Failed to get interval: %v", err)
-	}
-
-	sc.announceP.SequenceID = sc.sequenceID
-	sc.announceP.LogMessageInterval = i
-	sc.announceP.CurrentUTCOffset = int16(sc.serverConfig.UTCOffset.Seconds())
-
-	return sc.announceP
 }

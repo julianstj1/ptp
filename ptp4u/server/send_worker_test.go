@@ -35,23 +35,17 @@ func TestWorkerQueue(t *testing.T) {
 	st := stats.NewJSONStats()
 	go st.Start(0)
 	time.Sleep(time.Millisecond)
-	queue := make(chan *SubscriptionClient)
 
-	w := &sendWorker{
-		id:     0,
-		queue:  queue,
-		stats:  st,
-		config: c,
-	}
+	w := NewSendWorker(0, c, st)
 
 	go w.Start()
 
 	interval := time.Millisecond
 	expire := time.Now().Add(time.Millisecond)
-	sc := NewSubscriptionClient(w, net.ParseIP("127.0.0.1"), ptp.MessageAnnounce, c, interval, expire)
+	sc := NewSubscriptionClient(w.queue, net.ParseIP("127.0.0.1"), ptp.MessageAnnounce, interval, expire)
 
 	for i := 0; i < 10; i++ {
 		w.queue <- sc
 	}
-	require.Equal(t, 0, len(queue))
+	require.Equal(t, 0, len(w.queue))
 }

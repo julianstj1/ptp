@@ -22,6 +22,7 @@ import (
 	"net"
 	"net/http"
 	_ "net/http/pprof"
+	"runtime"
 	"time"
 
 	ptp "github.com/facebookincubator/ptp/protocol"
@@ -35,6 +36,7 @@ func main() {
 
 	var ipaddr string
 	var pprofaddr string
+	var ballastSize int
 
 	flag.StringVar(&ipaddr, "ip", "::", "IP to bind on")
 	flag.StringVar(&pprofaddr, "pprofaddr", "", "host:port for the pprof to bind")
@@ -49,8 +51,14 @@ func main() {
 	flag.IntVar(&c.MonitoringPort, "monitoringport", 8888, "Port to run monitoring server on")
 	flag.IntVar(&c.QueueSize, "queue", 10000, "Size of the queue to send out packets")
 	flag.DurationVar(&c.MetricInterval, "metricinterval", 1*time.Minute, "Interval of resetting metrics")
+	flag.IntVar(&ballastSize, "ballastSize", 1024, "Size of heap ballast in Mb")
 
 	flag.Parse()
+
+	// see https://github.com/golang/go/issues/23044
+	// also https://github.com/golang/go/issues/42430
+	// and https://blog.twitch.tv/en/2019/04/10/go-memory-ballast-how-i-learnt-to-stop-worrying-and-love-the-heap-26c2462549a2/
+	ballast := make([]byte, 1024*1024*ballastSize)
 
 	switch c.LogLevel {
 	case "trace":
@@ -113,4 +121,5 @@ func main() {
 	if err := s.Start(); err != nil {
 		log.Fatalf("Server run failed: %v", err)
 	}
+	runtime.KeepAlive(ballast)
 }

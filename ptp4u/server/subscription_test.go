@@ -37,10 +37,9 @@ func TestRunning(t *testing.T) {
 
 func TestSubscriptionStart(t *testing.T) {
 	w := &sendWorker{}
-	c := &Config{clockIdentity: ptp.ClockIdentity(1234)}
 	interval := 1 * time.Minute
 	expire := time.Now().Add(1 * time.Second)
-	sc := NewSubscriptionClient(w, net.ParseIP("127.0.0.1"), ptp.MessageAnnounce, c, interval, expire)
+	sc := NewSubscriptionClient(w.queue, net.ParseIP("127.0.0.1"), ptp.MessageAnnounce, interval, expire)
 
 	go sc.Start()
 	time.Sleep(100 * time.Millisecond)
@@ -51,10 +50,9 @@ func TestSubscriptionStop(t *testing.T) {
 	w := &sendWorker{
 		queue: make(chan *SubscriptionClient, 100),
 	}
-	c := &Config{clockIdentity: ptp.ClockIdentity(1234)}
 	interval := 10 * time.Millisecond
 	expire := time.Now().Add(1 * time.Second)
-	sc := NewSubscriptionClient(w, net.ParseIP("127.0.0.1"), ptp.MessageAnnounce, c, interval, expire)
+	sc := NewSubscriptionClient(w.queue, net.ParseIP("127.0.0.1"), ptp.MessageAnnounce, interval, expire)
 
 	go sc.Start()
 	time.Sleep(100 * time.Millisecond)
@@ -65,50 +63,9 @@ func TestSubscriptionStop(t *testing.T) {
 }
 
 func TestSubscriptionflags(t *testing.T) {
-	w := &sendWorker{}
 	c := &Config{clockIdentity: ptp.ClockIdentity(1234)}
-	sc := NewSubscriptionClient(w, net.ParseIP("127.0.0.1"), ptp.MessageAnnounce, c, time.Second, time.Time{})
-
-	require.Equal(t, ptp.FlagUnicast|ptp.FlagTwoStep, sc.syncPacket().Header.FlagField)
-	require.Equal(t, ptp.FlagUnicast, sc.followupPacket(time.Now()).Header.FlagField)
-	require.Equal(t, ptp.FlagUnicast|ptp.FlagPTPTimescale, sc.announcePacket().Header.FlagField)
-}
-
-func TestSyncMapSub(t *testing.T) {
-	sm := syncMapSub{}
-	sm.init()
-	require.Equal(t, 0, len(sm.keys()))
-
-	ci := ptp.ClockIdentity(1234)
-	c := &Config{clockIdentity: ci}
-	sc := &SubscriptionClient{serverConfig: c}
-	st := ptp.MessageAnnounce
-	sm.store(st, sc)
-
-	sct, ok := sm.load(st)
-	require.True(t, ok)
-	require.Equal(t, sc, sct)
-	require.Equal(t, 1, len(sm.keys()))
-}
-
-func TestSyncMapCli(t *testing.T) {
-	sm := syncMapCli{}
-	sm.init()
-	require.Equal(t, 0, len(sm.keys()))
-
-	pi := ptp.PortIdentity{
-		PortNumber:    1,
-		ClockIdentity: ptp.ClockIdentity(1234),
-	}
-
-	val := &syncMapSub{}
-	val.init()
-
-	sm.store(pi, val)
-	require.Equal(t, 1, len(sm.keys()))
-
-	valt, ok := sm.load(pi)
-	require.True(t, ok)
-	require.Equal(t, val, valt)
-	require.Equal(t, 1, len(sm.keys()))
+	w := NewSendWorker(0, c, nil)
+	require.Equal(t, ptp.FlagUnicast|ptp.FlagTwoStep, w.syncPacket(1).Header.FlagField)
+	require.Equal(t, ptp.FlagUnicast, w.followupPacket(time.Second, 1, time.Now()).Header.FlagField)
+	require.Equal(t, ptp.FlagUnicast|ptp.FlagPTPTimescale, w.announcePacket(time.Second, 1).Header.FlagField)
 }
