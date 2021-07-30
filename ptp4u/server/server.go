@@ -518,3 +518,14 @@ func ipToSockaddr(ip net.IP, port int) unix.Sockaddr {
 		return sa
 	}
 }
+
+// Somewhat copy from https://github.com/golang/go/blob/658b5e66ecbc41a49e6fb5aa63c5d9c804cf305f/src/net/udpsock_posix.go#L15
+func sockaddrToIP(sa unix.Sockaddr) net.IP {
+	switch sa := sa.(type) {
+	case *unix.SockaddrInet4:
+		return sa.Addr[0:]
+	case *unix.SockaddrInet6:
+		return sa.Addr[0:]
+	}
+	return nil
+}

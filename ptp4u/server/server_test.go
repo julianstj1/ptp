@@ -180,6 +180,18 @@ func TestDelayRespPacket(t *testing.T) {
 	require.Equal(t, ptp.FlagUnicast, dResp.Header.FlagField)
 }
 
+func TestSockaddrToIP(t *testing.T) {
+	ip4 := net.ParseIP("127.0.0.1")
+	ip6 := net.ParseIP("::1")
+	port := 123
+
+	sa4 := ipToSockaddr(ip4, port)
+	sa6 := ipToSockaddr(ip6, port)
+
+	require.Equal(t, ip4.String(), sockaddrToIP(sa4).String())
+	require.Equal(t, ip6.String(), sockaddrToIP(sa6).String())
+}
+
 func TestIpToSockaddr(t *testing.T) {
 	ip4 := net.ParseIP("127.0.0.1")
 	ip6 := net.ParseIP("::1")
