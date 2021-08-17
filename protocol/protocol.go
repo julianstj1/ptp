@@ -65,7 +65,7 @@ type Header struct {
 	LogMessageInterval  LogInterval // see Table 42 Values of logMessageInterval field
 }
 
-const headerSize = 34 // bytes
+const HeaderSize = 34 // bytes
 
 // unmarshalHeader is not a Header.UnmarshalBinary to prevent all packets
 // from having default (and incomplete) UnmarshalBinary implementation through embedding
@@ -111,7 +111,7 @@ func headerMarshalBinaryTo(p *Header, b []byte) int {
 	binary.BigEndian.PutUint16(b[30:], p.SequenceID)
 	b[32] = byte(p.ControlField)
 	b[33] = byte(p.LogMessageInterval)
-	return headerSize
+	return HeaderSize
 }
 
 // flags used in FlagField as per Table 37 Values of flagField
@@ -162,7 +162,7 @@ type Announce struct {
 }
 
 func (p *Announce) MarshalBinaryTo(b []byte) (int, error) {
-	if len(b) < headerSize+30 {
+	if len(b) < HeaderSize+30 {
 		return 0, fmt.Errorf("not enough buffer to write Announce")
 	}
 	n := headerMarshalBinaryTo(&p.Header, b)
@@ -200,7 +200,7 @@ type SyncDelayReq struct {
 }
 
 func (p *SyncDelayReq) MarshalBinaryTo(b []byte) (int, error) {
-	if len(b) < headerSize+10 {
+	if len(b) < HeaderSize+10 {
 		return 0, fmt.Errorf("not enough buffer to write SyncDelayReq")
 	}
 	n := headerMarshalBinaryTo(&p.Header, b)
@@ -217,12 +217,12 @@ func (p *SyncDelayReq) MarshalBinary() ([]byte, error) {
 }
 
 func (p *SyncDelayReq) UnmarshalBinary(b []byte) error {
-	if len(b) < headerSize+10 {
+	if len(b) < HeaderSize+10 {
 		return fmt.Errorf("not enough data to decode SyncDelayReq")
 	}
 	unmarshalHeader(&p.Header, b)
-	copy(p.OriginTimestamp.Seconds[:], b[headerSize:]) //uint48
-	p.OriginTimestamp.Nanoseconds = binary.BigEndian.Uint32(b[headerSize+6:])
+	copy(p.OriginTimestamp.Seconds[:], b[HeaderSize:]) //uint48
+	p.OriginTimestamp.Nanoseconds = binary.BigEndian.Uint32(b[HeaderSize+6:])
 	return nil
 }
 
@@ -238,7 +238,7 @@ type FollowUp struct {
 }
 
 func (p *FollowUp) MarshalBinaryTo(b []byte) (int, error) {
-	if len(b) < headerSize+10 {
+	if len(b) < HeaderSize+10 {
 		return 0, fmt.Errorf("not enough buffer to write FollowUp")
 	}
 	n := headerMarshalBinaryTo(&p.Header, b)
@@ -255,12 +255,12 @@ func (p *FollowUp) MarshalBinary() ([]byte, error) {
 }
 
 func (p *FollowUp) UnmarshalBinary(b []byte) error {
-	if len(b) < headerSize+10 {
+	if len(b) < HeaderSize+10 {
 		return fmt.Errorf("not enough data to decode FollowUp")
 	}
 	unmarshalHeader(&p.Header, b)
-	copy(p.PreciseOriginTimestamp.Seconds[:], b[headerSize:]) //uint48
-	p.PreciseOriginTimestamp.Nanoseconds = binary.BigEndian.Uint32(b[headerSize+6:])
+	copy(p.PreciseOriginTimestamp.Seconds[:], b[HeaderSize:]) //uint48
+	p.PreciseOriginTimestamp.Nanoseconds = binary.BigEndian.Uint32(b[HeaderSize+6:])
 	return nil
 }
 
@@ -277,7 +277,7 @@ type DelayResp struct {
 }
 
 func (p *DelayResp) MarshalBinaryTo(b []byte) (int, error) {
-	if len(b) < headerSize+20 {
+	if len(b) < HeaderSize+20 {
 		return 0, fmt.Errorf("not enough buffer to write DelayResp")
 	}
 	n := headerMarshalBinaryTo(&p.Header, b)
@@ -296,14 +296,14 @@ func (p *DelayResp) MarshalBinary() ([]byte, error) {
 }
 
 func (p *DelayResp) UnmarshalBinary(b []byte) error {
-	if len(b) < headerSize+20 {
+	if len(b) < HeaderSize+20 {
 		return fmt.Errorf("not enough data to decode DelayResp")
 	}
 	unmarshalHeader(&p.Header, b)
-	copy(p.ReceiveTimestamp.Seconds[:], b[headerSize:]) //uint48
-	p.ReceiveTimestamp.Nanoseconds = binary.BigEndian.Uint32(b[headerSize+6:])
-	p.RequestingPortIdentity.ClockIdentity = ClockIdentity(binary.BigEndian.Uint64(b[headerSize+10:]))
-	p.RequestingPortIdentity.PortNumber = binary.BigEndian.Uint16(b[headerSize+18:])
+	copy(p.ReceiveTimestamp.Seconds[:], b[HeaderSize:]) //uint48
+	p.ReceiveTimestamp.Nanoseconds = binary.BigEndian.Uint32(b[HeaderSize+6:])
+	p.RequestingPortIdentity.ClockIdentity = ClockIdentity(binary.BigEndian.Uint64(b[HeaderSize+10:]))
+	p.RequestingPortIdentity.PortNumber = binary.BigEndian.Uint16(b[HeaderSize+18:])
 	return nil
 }
 

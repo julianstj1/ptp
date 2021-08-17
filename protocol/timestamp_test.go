@@ -157,7 +157,7 @@ func TestSocketControlMessageTimestamp(t *testing.T) {
 	}
 
 	b := []byte{60, 0, 0, 0, 0, 0, 0, 0, 41, 0, 0, 0, 25, 0, 0, 0, 42, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 64, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 65, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 230, 180, 10, 97, 0, 0, 0, 0, 239, 83, 199, 39, 0, 0, 0, 0}
-	ts, err := socketControlMessageTimestamp(b)
+	ts, err := SocketControlMessageTimestamp(b)
 	require.NoError(t, err)
 	require.Equal(t, int64(1628091622667374575), ts.UnixNano())
 

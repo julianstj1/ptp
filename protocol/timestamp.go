@@ -65,6 +65,10 @@ func init() {
 	}
 }
 
+func Timestamping() int {
+	return timestamping
+}
+
 // Ifreq is a struct for ioctl ethernet manipulation syscalls.
 type ifreq struct {
 	name [unix.IFNAMSIZ]byte
@@ -93,7 +97,7 @@ func ConnFd(conn *net.UDPConn) (int, error) {
 	return intfd, nil
 }
 
-func ioctlTimestamp(fd int, ifname string) error {
+func IoctlTimestamp(fd int, ifname string) error {
 	hw := &hwtstampСonfig{
 		flags:    0,
 		txType:   hwtstampTXON,
@@ -110,7 +114,7 @@ func ioctlTimestamp(fd int, ifname string) error {
 
 // EnableHWTimestampsSocket enables HW timestamps on the socket
 func EnableHWTimestampsSocket(connFd int, iface string) error {
-	if err := ioctlTimestamp(connFd, iface); err != nil {
+	if err := IoctlTimestamp(connFd, iface); err != nil {
 		return err
 	}
 
@@ -156,10 +160,10 @@ func byteToTime(data []byte) (time.Time, error) {
 	return time.Unix(sec, nsec), nil
 }
 
-// socketControlMessageTimestamp is a very optimised version of ParseSocketControlMessage
+// SocketControlMessageTimestamp is a very optimised version of ParseSocketControlMessage
 // https://github.com/golang/go/blob/2ebe77a2fda1ee9ff6fd9a3e08933ad1ebaea039/src/syscall/sockcmsg_unix.go#L40
 // which only parses the timestamp message type.
-func socketControlMessageTimestamp(b []byte) (time.Time, error) {
+func SocketControlMessageTimestamp(b []byte) (time.Time, error) {
 	mlen := 0
 	for i := 0; i < len(b); i += mlen {
 		h := (*unix.Cmsghdr)(unsafe.Pointer(&b[i]))
@@ -264,7 +268,7 @@ func ReadTXtimestampBuf(connFd int, oob, toob []byte) (time.Time, int, error) {
 	if !txfound {
 		return time.Time{}, attempts, fmt.Errorf("no TX timestamp found after %d tries", maxTXTS)
 	}
-	timestamp, err := socketControlMessageTimestamp(oob[:boob])
+	timestamp, err := SocketControlMessageTimestamp(oob[:boob])
 	return timestamp, attempts, err
 }
 
@@ -296,7 +300,7 @@ func ReadPacketWithRXTimestampBuf(connFd int, buf, oob []byte) (int, unix.Sockad
 		return 0, nil, time.Time{}, fmt.Errorf("failed to read timestamp: %v", err)
 	}
 
-	timestamp, err := socketControlMessageTimestamp(oob[:boob])
+	timestamp, err := SocketControlMessageTimestamp(oob[:boob])
 	return bbuf, saddr, timestamp, err
 }
 

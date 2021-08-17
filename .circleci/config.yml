@@ -14,8 +14,13 @@ jobs:
       tag: '1.16'
     steps:
       - checkout
-      - run: sudo apt-get install libpcap-dev
-      - run: go get -v -t ./...
+      - run: sudo apt-get install bison flex
+      - run: git clone https://github.com/ntop/PF_RING.git
+      - run: sudo cp PF_RING/kernel/linux/pf_ring.h /usr/include/linux/
+      - run: cd PF_RING/userland/lib; sudo ./configure && sudo make; sudo make install; cd ../libpcap; sudo ./configure && sudo make; sudo make install; cd ../../../
+      - run: C_INCLUDE_PATH=/go/src/github.com/facebookincubator/ptp/PF_RING/kernel; export C_INCLUDE_PATH
+      - run: sudo apt-get install libpcap-dev 
+      - run: CGO_CFLAGS="-IPF_RING/kernel/linux -IPF_RING/kernel" go get -v -t ./...
       - run: .circleci/linters.sh
   build:
     working_directory: /go/src/github.com/facebookincubator/ptp
@@ -24,8 +29,13 @@ jobs:
       tag: '1.16'
     steps:
       - checkout
-      - run: sudo apt-get install libpcap-dev
-      - run: go get -v -t ./...
+      - run: sudo apt-get install bison flex
+      - run: git clone https://github.com/ntop/PF_RING.git
+      - run: sudo cp PF_RING/kernel/linux/pf_ring.h /usr/include/linux/
+      - run: cd PF_RING/userland/lib; sudo ./configure && sudo make; sudo make install; cd ../libpcap; sudo ./configure && sudo make; sudo make install; cd ../../../
+      - run: C_INCLUDE_PATH=/go/src/github.com/facebookincubator/ptp/PF_RING/kernel; export C_INCLUDE_PATH
+      - run: sudo apt-get install libpcap-dev 
+      - run: CGO_CFLAGS="-IPF_RING/kernel/linux -IPF_RING/kernel" go get -v -t ./... 
       - run: .circleci/build.sh
   tests:
     working_directory: /go/src/github.com/facebookincubator/ptp
@@ -34,8 +44,13 @@ jobs:
       tag: '1.16'
     steps:
       - checkout
-      - run: sudo apt-get install libpcap-dev
-      - run: go get -v -t ./...
+      - run: sudo apt-get install bison flex
+      - run: git clone https://github.com/ntop/PF_RING.git
+      - run: sudo cp PF_RING/kernel/linux/pf_ring.h /usr/include/linux/
+      - run: cd PF_RING/userland/lib; sudo ./configure && sudo make; sudo make install; cd ../libpcap; sudo ./configure && sudo make; sudo make install; cd ../../../
+      - run: C_INCLUDE_PATH=/go/src/github.com/facebookincubator/ptp/PF_RING/kernel; export C_INCLUDE_PATH
+      - run: CGO_CFLAGS="-IPF_RING/kernel/linux -IPF_RING/kernel" go get -v -t ./... 
+      - run: sudo apt-get install libpcap-dev 
       - run: .circleci/tests.sh
 
 

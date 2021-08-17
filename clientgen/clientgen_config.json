@@ -1,0 +1,44 @@
+{
+	"Iface": "ens1f0np0",
+
+	"ServerMAC": "0c:42:a1:80:31:66",
+	"ServerAddress": "10.254.254.254",
+	"ClientIPStart": "10.1.1.2",
+	"ClientIPEnd": "10.1.1.2",
+	"ClientIPStep": 2,
+	"SoftStartRate": 1000000000000000,
+	
+	"TimeoutSec": 10,
+	"DurationSec": 4,
+	"TimeAfterDurationBeforeRestartSec": 1,
+	"TimeBetweenDelayReqSec": 1,
+	"ClientRetranTimeWhenNoResponseSec": 1,
+
+
+	"NumTXWorkers": 4,
+	"NumTXTSWorkerPerTx": 3,
+	"NumRXWorkers": 4,
+	"NumPacketParsers": 4,
+	"NumPacketProcessors": 4,
+	"NumClientRetransmitProcs": 4,
+	"NumClientRestartProcs": 4,
+
+	"RestartClientsAfterDuration": false,
+
+	"DebugPrint": false,
+	"DebugLogClient": false,
+	"DebugIoWkrRX": false,
+	"DebugIoWkrTX": false,
+	"DebugDetailPerf": false,
+	"DebugRestartProc": false,
+	"DebugRetransProc": false,
+	"DebugProfilers": false,
+	
+
+	"PrintPerformance" : true,
+	"PrintClientData" : true,
+	"PrintTxRxCounts" : true,
+	"PrintClientReqData" : true,
+	"PrintLatencyData" : true,
+	"CounterPrintIntervalSecs": 1
+}

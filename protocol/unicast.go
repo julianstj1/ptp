@@ -25,6 +25,8 @@ import (
 // UnicastMsgTypeAndFlags is a uint8 where first 4 bites contain MessageType and last 4 bits contain some flags
 type UnicastMsgTypeAndFlags uint8
 
+const RequestUnicastTransmissionTLVSize = 10
+
 // MsgType extracts MessageType from UnicastMsgTypeAndFlags
 func (m UnicastMsgTypeAndFlags) MsgType() MessageType {
 	return MessageType(m >> 4)
@@ -79,7 +81,7 @@ func (p *Signaling) MarshalBinary() ([]byte, error) {
 }
 
 func unmarshalTLVHeader(p *TLVHead, b []byte) error {
-	if len(b) < tlvHeadSize {
+	if len(b) < TlvHeadSize {
 		return fmt.Errorf("not enough data to decode PTP header")
 	}
 	p.TLVType = TLVType(binary.BigEndian.Uint16(b[0:]))
@@ -89,22 +91,22 @@ func unmarshalTLVHeader(p *TLVHead, b []byte) error {
 
 // UnmarshalBinary parses []byte and populates struct fields
 func (p *Signaling) UnmarshalBinary(b []byte) error {
-	if len(b) < headerSize+10+tlvHeadSize {
+	if len(b) < HeaderSize+10+TlvHeadSize {
 		return fmt.Errorf("not enough data to decode Signaling")
 	}
 	unmarshalHeader(&p.Header, b)
 	if p.SdoIDAndMsgType.MsgType() != MessageSignaling {
 		return fmt.Errorf("not a signaling message %v", b)
 	}
-	p.TargetPortIdentity.ClockIdentity = ClockIdentity(binary.BigEndian.Uint64(b[headerSize:]))
-	p.TargetPortIdentity.PortNumber = binary.BigEndian.Uint16(b[headerSize+8:])
+	p.TargetPortIdentity.ClockIdentity = ClockIdentity(binary.BigEndian.Uint64(b[HeaderSize:]))
+	p.TargetPortIdentity.PortNumber = binary.BigEndian.Uint16(b[HeaderSize+8:])
 
-	pos := headerSize + 10
+	pos := HeaderSize + 10
 	var tlvType TLVType
 	for {
 		head := TLVHead{}
 		// packet can have trailing bytes, let's make sure we don't try to read past given length
-		if pos+tlvHeadSize > int(p.MessageLength) {
+		if pos+TlvHeadSize > int(p.MessageLength) {
 			break
 		}
 		tlvType = TLVType(binary.BigEndian.Uint16(b[pos:]))
@@ -116,7 +118,7 @@ func (p *Signaling) UnmarshalBinary(b []byte) error {
 				return err
 			}
 			p.TLVs = append(p.TLVs, tlv)
-			pos += tlvHeadSize + int(tlv.LengthField)
+			pos += TlvHeadSize + int(tlv.LengthField)
 
 		case TLVGrantUnicastTransmission:
 			tlv := &GrantUnicastTransmissionTLV{}
@@ -124,7 +126,7 @@ func (p *Signaling) UnmarshalBinary(b []byte) error {
 				return err
 			}
 			p.TLVs = append(p.TLVs, tlv)
-			pos += tlvHeadSize + int(tlv.LengthField)
+			pos += TlvHeadSize + int(tlv.LengthField)
 
 		case TLVRequestUnicastTransmission:
 			tlv := &RequestUnicastTransmissionTLV{}
@@ -132,14 +134,14 @@ func (p *Signaling) UnmarshalBinary(b []byte) error {
 				return err
 			}
 			p.TLVs = append(p.TLVs, tlv)
-			pos += tlvHeadSize + int(tlv.LengthField)
+			pos += TlvHeadSize + int(tlv.LengthField)
 		case TLVCancelUnicastTransmission:
 			tlv := &CancelUnicastTransmissionTLV{}
 			if err := tlv.UnmarshalBinary(b[pos:]); err != nil {
 				return err
 			}
 			p.TLVs = append(p.TLVs, tlv)
-			pos += tlvHeadSize + int(tlv.LengthField)
+			pos += TlvHeadSize + int(tlv.LengthField)
 		default:
 			return fmt.Errorf("reading TLV %s (%d) is not yet implemented", head.TLVType, head.TLVType)
 		}
@@ -162,10 +164,10 @@ type RequestUnicastTransmissionTLV struct {
 
 func (t *RequestUnicastTransmissionTLV) MarshalBinaryTo(b []byte) (int, error) {
 	tlvHeadMarshalBinaryTo(&t.TLVHead, b)
-	b[tlvHeadSize] = byte(t.MsgTypeAndReserved)
-	b[tlvHeadSize+1] = byte(t.LogInterMessagePeriod)
-	binary.BigEndian.PutUint32(b[tlvHeadSize+2:], t.DurationField)
-	return tlvHeadSize + 6, nil
+	b[TlvHeadSize] = byte(t.MsgTypeAndReserved)
+	b[TlvHeadSize+1] = byte(t.LogInterMessagePeriod)
+	binary.BigEndian.PutUint32(b[TlvHeadSize+2:], t.DurationField)
+	return TlvHeadSize + 6, nil
 }
 
 // UnmarshalBinary parses []byte and populates struct fields
@@ -191,12 +193,12 @@ type GrantUnicastTransmissionTLV struct {
 
 func (t *GrantUnicastTransmissionTLV) MarshalBinaryTo(b []byte) (int, error) {
 	tlvHeadMarshalBinaryTo(&t.TLVHead, b)
-	b[tlvHeadSize] = byte(t.MsgTypeAndReserved)
-	b[tlvHeadSize+1] = byte(t.LogInterMessagePeriod)
-	binary.BigEndian.PutUint32(b[tlvHeadSize+2:], t.DurationField)
-	b[tlvHeadSize+6] = t.Reserved
-	b[tlvHeadSize+7] = t.Renewal
-	return tlvHeadSize + 8, nil
+	b[TlvHeadSize] = byte(t.MsgTypeAndReserved)
+	b[TlvHeadSize+1] = byte(t.LogInterMessagePeriod)
+	binary.BigEndian.PutUint32(b[TlvHeadSize+2:], t.DurationField)
+	b[TlvHeadSize+6] = t.Reserved
+	b[TlvHeadSize+7] = t.Renewal
+	return TlvHeadSize + 8, nil
 }
 
 // UnmarshalBinary parses []byte and populates struct fields
@@ -221,9 +223,9 @@ type CancelUnicastTransmissionTLV struct {
 
 func (t *CancelUnicastTransmissionTLV) MarshalBinaryTo(b []byte) (int, error) {
 	tlvHeadMarshalBinaryTo(&t.TLVHead, b)
-	b[tlvHeadSize] = byte(t.MsgTypeAndFlags)
-	b[tlvHeadSize+1] = byte(t.Reserved)
-	return tlvHeadSize + 2, nil
+	b[TlvHeadSize] = byte(t.MsgTypeAndFlags)
+	b[TlvHeadSize+1] = byte(t.Reserved)
+	return TlvHeadSize + 2, nil
 }
 
 // UnmarshalBinary parses []byte and populates struct fields
@@ -245,9 +247,9 @@ type AcknowledgeCancelUnicastTransmissionTLV struct {
 
 func (t *AcknowledgeCancelUnicastTransmissionTLV) MarshalBinaryTo(b []byte) (int, error) {
 	tlvHeadMarshalBinaryTo(&t.TLVHead, b)
-	b[tlvHeadSize] = byte(t.MsgTypeAndFlags)
-	b[tlvHeadSize+1] = byte(t.Reserved)
-	return tlvHeadSize + 2, nil
+	b[TlvHeadSize] = byte(t.MsgTypeAndFlags)
+	b[TlvHeadSize+1] = byte(t.Reserved)
+	return TlvHeadSize + 2, nil
 }
 
 // UnmarshalBinary parses []byte and populates struct fields

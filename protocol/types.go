@@ -92,7 +92,7 @@ type TLV interface {
 	Type() TLVType
 }
 
-const tlvHeadSize = 4
+const TlvHeadSize = 4
 
 // TLVHead is a common part of all TLVs
 type TLVHead struct {
@@ -239,6 +239,8 @@ type PortIdentity struct {
 	ClockIdentity ClockIdentity
 	PortNumber    uint16
 }
+
+const PortIdentitySize = 10
 
 // String formats PortIdentity same way ptp4l pmc client does
 func (p PortIdentity) String() string {
