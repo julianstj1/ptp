@@ -497,15 +497,15 @@ func handleRetransmit(cfg *ClientGenConfig, cl *SingleClientGen, fromPop bool, c
 	// push to transmit and add to retransmit
 	cfg.RunData.rawOutput[getTxChanNumToUse(cfg)] <- out
 
-	temp := fastime.Now().Add( time.Duration(float64(time.Second)*cfg.ClientRetranTimeWhenNoResponseSec) )
+	clRetransTime := fastime.Now().Add( time.Duration(float64(time.Second)*cfg.ClientRetranTimeWhenNoResponseSec) )
 
-	pushClientRetransmit(cfg, cl, temp)
+	pushClientRetransmit(cfg, cl, clRetransTime)
 	if pktType == pktAnnounceGrantReq {
-		cl.timeAnnounceGrantReqRetransmit = temp
+		cl.timeAnnounceGrantReqRetransmit = clRetransTime
 	} else if pktType == pktSyncGrantReq {
-		cl.timeSyncGrantReqRetransmit = temp
+		cl.timeSyncGrantReqRetransmit = clRetransTime
 	} else if pktType == pktDelayRespGrantReq {
-		cl.timeDelayRespGrantReqRetransmit = temp
+		cl.timeDelayRespGrantReqRetransmit = clRetransTime
 	}
 
 }
